@@ -39,6 +39,8 @@ export interface ClipConfig {
   exclude: string[];
   tone?: string;
   duration: { min: number; max: number };
+  /** Detik ekstra yang ditambah ke akhir setiap clip saat download. Default: 1.5 */
+  end_buffer?: number;
 }
 
 export type Stage = "download-transcript" | "analyze-transcript" | "download-video" | "process-editing" | "process-rendering";

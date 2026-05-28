@@ -5,10 +5,15 @@
   "private": true,
   "scripts": {
     "dev": "bun run src/cli.ts",
-    "disingkat": "bun run src/cli.ts"
+    "disingkat": "bun run src/cli.ts",
+    "configure": "bun run src/configure.ts"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.100.0",
     "@inquirer/prompts": "^8.5.0",
+    "@openai/codex": "^0.135.0",
+    "@openai/codex-sdk": "^0.135.0",
+    "openai": "^6.39.1",
     "yaml": "^2.5.1"
   },
   "devDependencies": {
