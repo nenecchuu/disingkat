@@ -1,0 +1,16 @@
+node_modules/
+configs/clip_config.yaml
+configs/prompt.md
+bun.lockb
+
+workdir/
+
+.env
+.env.local
+
+*.log
+.DS_Store
+
+__pycache__/
+*.pyc
+*.pyo

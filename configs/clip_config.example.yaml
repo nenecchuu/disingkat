@@ -1,0 +1,19 @@
+audience: Indonesia, urban, 18-35
+
+tone: provocative-but-factual
+
+topics_of_interest:
+  - quotes yang menginspirasi
+  - kritik kebijakan pemerintah
+  - kontroversi pejabat publik
+
+keywords:
+  - Dollar
+  - Sawit
+
+exclude:
+  - Clip yang jadi out of context karena diambil dari bagian yang salah
+
+duration:
+  min: 30
+  max: 90
