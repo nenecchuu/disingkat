@@ -6,6 +6,23 @@ import type { ClipSpec } from "./types.ts";
 export type Platform = "anthropic" | "openai" | "codex";
 
 /**
+ * Call an LLM dan return raw text response.
+ * Untuk use case selain analyze (misal: koreksi subtitle).
+ */
+export async function callLLM(
+  modelId: string,
+  systemPrompt: string,
+  userPrompt: string,
+): Promise<string> {
+  const platform = resolvePlatform(modelId);
+  process.stdout.write(`[llm] ${platform}/${modelId}...\n`);
+
+  if (platform === "anthropic") return callAnthropic(modelId, systemPrompt, userPrompt);
+  if (platform === "codex") return callCodex(systemPrompt, userPrompt);
+  return callOpenAI(modelId, systemPrompt, userPrompt);
+}
+
+/**
  * Call an LLM and return parsed ClipSpec[].
  * Platform + model dibaca dari env: DISINGKAT_PLATFORM + DISINGKAT_MODEL.
  * systemPrompt = instructions + config (cacheable di Anthropic)

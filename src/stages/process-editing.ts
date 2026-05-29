@@ -28,7 +28,7 @@ export async function run(input: ReframeInput): Promise<ReframeOutput> {
 
   for (let i = 0; i < rawFiles.length; i++) {
     const inP = `${p.raw}/${rawFiles[i]}`;
-    const outP = p.reframed(i + 1);
+    const outP = p.reframedClip(i + 1);
 
     if (mode === "speaker-crop") {
       await reframeSpeakerCrop(inP, outP, p, i + 1);

@@ -1,13 +1,16 @@
 #!/usr/bin/env bun
-import { select, input } from "@inquirer/prompts";
+import { select, input, confirm } from "@inquirer/prompts";
 import fs from "node:fs/promises";
 import * as downloadTranscript from "./stages/download-transcript.ts";
 import * as analyzeTranscript from "./stages/analyze-transcript.ts";
 import * as downloadVideo from "./stages/download-video.ts";
 import * as processEditing from "./stages/process-editing.ts";
-import * as processRendering from "./stages/process-rendering.ts";
+import * as transcribe from "./stages/transcribe.ts";
+import * as verifySubtitle from "./stages/verify-subtitle.ts";
+import * as burnSubtitle from "./stages/burn-subtitle.ts";
 import * as pipeline from "./pipeline.ts";
 import { ManualStepRequired } from "./stages/analyze-transcript.ts";
+import { VerifyRequired } from "./stages/verify-subtitle.ts";
 import type { Stage } from "./types.ts";
 import { WORKDIR_ROOT } from "./workdir.ts";
 
@@ -16,16 +19,60 @@ const STAGES: Stage[] = [
   "analyze-transcript",
   "download-video",
   "process-editing",
-  "process-rendering",
+  "transcribe",
+  "verify-subtitle",
+  "burn-subtitle",
 ];
+
+type EditingMode = "center-crop" | "speaker-crop" | "split-vertical" | "letterbox";
+type WhisperModel = "tiny" | "base" | "small" | "medium" | "large";
+
+// ── shared prompts ────────────────────────────────────────────────────────────
+
+async function askEditingMode(): Promise<EditingMode> {
+  return select({
+    message: "Mode reframe:",
+    choices: [
+      { name: "center-crop    — potong tengah ke 9:16 (default)", value: "center-crop" },
+      { name: "speaker-crop   — auto-crop ke speaker yang lagi ngomong", value: "speaker-crop" },
+      { name: "split-vertical — 2 orang stack vertikal", value: "split-vertical" },
+      { name: "letterbox      — full frame + black bars", value: "letterbox" },
+    ],
+    default: "center-crop",
+  }) as Promise<EditingMode>;
+}
+
+async function askWhisperModel(): Promise<WhisperModel> {
+  return select({
+    message: "Whisper model untuk subtitle:",
+    choices: [
+      { name: "base   — cepat, akurasi cukup (default)", value: "base" },
+      { name: "small  — lebih akurat, ~2x lebih lambat", value: "small" },
+      { name: "medium — paling akurat, ~5x lebih lambat", value: "medium" },
+      { name: "tiny   — paling cepat, akurasi minimal", value: "tiny" },
+    ],
+    default: "base",
+  }) as Promise<WhisperModel>;
+}
+
+async function askWithSubtitle(): Promise<boolean> {
+  return confirm({ message: "Tambahkan subtitle?", default: false });
+}
+
+function willRun(from: Stage, to: Stage, stage: Stage): boolean {
+  return STAGES.indexOf(from) <= STAGES.indexOf(stage) &&
+         STAGES.indexOf(to)   >= STAGES.indexOf(stage);
+}
+
+// ── flows ─────────────────────────────────────────────────────────────────────
 
 async function main() {
   const action = await select({
     message: "Mau ngapain?",
     choices: [
-      { name: "Proses video baru (dari URL YouTube)", value: "new" },
-      { name: "Lanjutin video yang udah ada", value: "continue" },
-      { name: "Jalanin 1 stage doang", value: "single" },
+      { name: "Full  — proses video baru dari URL YouTube", value: "new" },
+      { name: "Existing — lanjutin video yang udah ada", value: "continue" },
+      { name: "Run   — jalanin 1 stage doang", value: "single" },
       { name: "Keluar", value: "quit" },
     ],
   });
@@ -44,13 +91,18 @@ async function runNew() {
       "URL YouTube ga valid",
   });
 
-  const to = (await select({
-    message: "Berhenti di stage mana?",
-    choices: STAGES.map((s) => ({ name: s, value: s })),
-    default: "process-rendering",
-  })) as Stage;
+  const editingMode  = await askEditingMode();
+  const withSubtitle = await askWithSubtitle();
+  const whisperModel = withSubtitle ? await askWhisperModel() : undefined;
+  const to: Stage    = withSubtitle ? "burn-subtitle" : "process-editing";
 
-  await pipeline.run({ urlOrId: url.trim(), from: "download-transcript", to });
+  await pipeline.run({
+    urlOrId: url.trim(),
+    from: "download-transcript",
+    to,
+    editingMode,
+    whisperModel,
+  });
 }
 
 async function runContinue() {
@@ -63,16 +115,15 @@ async function runContinue() {
     default: "analyze-transcript",
   })) as Stage;
 
-  const to = (await select({
-    message: "Berhenti di stage mana?",
-    choices: STAGES.filter((s) => STAGES.indexOf(s) >= STAGES.indexOf(from)).map((s) => ({
-      name: s,
-      value: s,
-    })),
-    default: "process-rendering",
-  })) as Stage;
+  const editingMode  = willRun(from, "process-editing", "process-editing") ? await askEditingMode()  : undefined;
+  const withSubtitle = await askWithSubtitle();
+  const whisperModel = withSubtitle ? await askWhisperModel() : undefined;
+  const to: Stage    = withSubtitle ? "burn-subtitle" : "process-editing";
 
-  await pipeline.run({ urlOrId: videoId, from, to });
+  // Kalau from sudah melewati process-editing, to harus minimal from
+  const effectiveTo = STAGES.indexOf(to) >= STAGES.indexOf(from) ? to : "burn-subtitle";
+
+  await pipeline.run({ urlOrId: videoId, from, to: effectiveTo, editingMode, whisperModel });
 }
 
 async function runSingle() {
@@ -109,28 +160,31 @@ async function runSingle() {
       return;
     }
     case "process-editing": {
-      const mode = (await select({
-        message: "Mode reframe:",
-        choices: [
-          { name: "center-crop  — potong tengah ke 9:16 (default)", value: "center-crop" },
-          { name: "speaker-crop — auto-crop ke speaker yang lagi ngomong", value: "speaker-crop" },
-          { name: "split-vertical — 2 orang stack vertikal", value: "split-vertical" },
-          { name: "letterbox    — full frame + black bars", value: "letterbox" },
-        ],
-        default: "center-crop",
-      })) as "split-vertical" | "center-crop" | "letterbox" | "speaker-crop";
+      const mode = await askEditingMode();
       const out = await processEditing.run({ videoId, mode });
       console.log(`\n[done] ${out.clipPaths.length} clip(s) edited`);
       return;
     }
-    case "process-rendering": {
-      const out = await processRendering.run({ videoId });
+    case "transcribe": {
+      const whisperModel = await askWhisperModel();
+      const out = await transcribe.run({ videoId, model: whisperModel });
+      console.log(`\n[done] ${out.wordsPaths.length} clip(s) transcribed`);
+      return;
+    }
+    case "verify-subtitle": {
+      await verifySubtitle.run({ videoId });
+      return;
+    }
+    case "burn-subtitle": {
+      const out = await burnSubtitle.run({ videoId });
       console.log(`\n[done] ${out.finalPaths.length} clip(s) final:`);
       for (const f of out.finalPaths) console.log(`  - ${f}`);
       return;
     }
   }
 }
+
+// ── helpers ───────────────────────────────────────────────────────────────────
 
 async function pickVideoId(): Promise<string | null> {
   const existing = await listWorkdirVideos();
@@ -174,6 +228,10 @@ async function listWorkdirVideos(): Promise<string[]> {
 main().catch((err) => {
   if (err instanceof ManualStepRequired) {
     console.log(`\n[manual step]\n${err.message}`);
+    return;
+  }
+  if (err instanceof VerifyRequired) {
+    console.log(`\n[verify subtitle]\n${err.message}`);
     return;
   }
   if (err?.name === "ExitPromptError") return;

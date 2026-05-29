@@ -140,8 +140,10 @@ Pipeline terdiri dari 5 stage yang bisa dijalanin secara standalone via menu int
 | `download-transcript` | YouTube URL | `data/transcript.txt`, `data/subtitle.vtt` |
 | `analyze-transcript` | `data/subtitle.vtt` | `data/clips.json` |
 | `download-video` | `data/clips.json` | `raw/clip_NN_raw.mp4` per clip |
-| `process-editing` | `raw/clip_NN_raw.mp4` | `data/clip_NN_reframed.mp4` (9:16) |
-| `process-rendering` | `data/clip_NN_reframed.mp4` | `clip_NN_final.mp4` (dengan subtitle) |
+| `process-editing` | `raw/clip_NN_raw.mp4` | `reframed/clip_NN_reframed.mp4` (9:16) |
+| `transcribe` | `reframed/clip_NN_reframed.mp4` | `data/clip_NN_words.json` |
+| `verify-subtitle` | `data/clip_NN_words.json` | `data/clip_NN_words.json` (dikoreksi) |
+| `burn-subtitle` | `reframed/clip_NN_reframed.mp4` + `data/clip_NN_words.json` | `clip_NN_final.mp4` |
 
 Semua artifact disimpan di `workdir/<video-id>/`.
 
@@ -252,12 +254,14 @@ disingkat/
         ├── clip_01_final.mp4   # ← output akhir
         ├── raw/
         │   └── clip_NN_raw.mp4
+        ├── reframed/
+        │   └── clip_NN_reframed.mp4
         └── data/
             ├── clips.json
             ├── subtitle.vtt
             ├── transcript.txt
             ├── prompt.txt
-            ├── clip_NN_reframed.mp4
+            ├── clip_NN_words.json
             ├── clip_NN.srt
             ├── clip_NN_scenes.json
             └── clip_NN_speaker_events.json

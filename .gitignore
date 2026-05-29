@@ -1,6 +1,7 @@
 node_modules/
 configs/clip_config.yaml
 configs/prompt.md
+configs/subtitle_prompt.md
 bun.lockb
 
 workdir/

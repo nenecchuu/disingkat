@@ -27,7 +27,12 @@ export interface ReframeOutput {
   clipPaths: string[];
 }
 
-export interface RenderOutput {
+export interface TranscribeOutput {
+  videoId: VideoId;
+  wordsPaths: string[];
+}
+
+export interface BurnOutput {
   videoId: VideoId;
   finalPaths: string[];
 }
@@ -43,4 +48,11 @@ export interface ClipConfig {
   end_buffer?: number;
 }
 
-export type Stage = "download-transcript" | "analyze-transcript" | "download-video" | "process-editing" | "process-rendering";
+export type Stage =
+  | "download-transcript"
+  | "analyze-transcript"
+  | "download-video"
+  | "process-editing"
+  | "transcribe"
+  | "verify-subtitle"
+  | "burn-subtitle";
