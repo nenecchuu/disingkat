@@ -29,7 +29,7 @@ export async function run(input: CutInput): Promise<CutOutput> {
 
   for (let i = 0; i < clips.length; i++) {
     const c = clips[i];
-    const out = p.raw(i + 1);
+    const out = p.rawClip(i + 1);
     const section = `*${toYtTimestamp(c.start)}-${toYtTimestamp(c.end + endBuffer)}`;
 
     await $`yt-dlp \

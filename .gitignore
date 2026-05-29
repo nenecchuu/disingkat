@@ -14,3 +14,6 @@ workdir/
 __pycache__/
 *.pyc
 *.pyo
+.venv/
+scripts/.venv/
+scripts/models/

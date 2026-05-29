@@ -1,4 +1,10 @@
-#!/usr/bin/env python3
+#!/usr/bin/env -S uv run
+# /// script
+# requires-python = ">=3.11"
+# dependencies = [
+#   "youtube-transcript-api>=1.0",
+# ]
+# ///
 """
 Usage: python3 get_transcript.py <youtube_url> <output_dir>
 

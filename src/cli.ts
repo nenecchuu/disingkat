@@ -112,12 +112,13 @@ async function runSingle() {
       const mode = (await select({
         message: "Mode reframe:",
         choices: [
-          { name: "split-vertical (2 orang stack vertikal)", value: "split-vertical" },
-          { name: "center-crop (potong tengah ke 9:16)", value: "center-crop" },
-          { name: "letterbox (full + black bars)", value: "letterbox" },
+          { name: "center-crop  — potong tengah ke 9:16 (default)", value: "center-crop" },
+          { name: "speaker-crop — auto-crop ke speaker yang lagi ngomong", value: "speaker-crop" },
+          { name: "split-vertical — 2 orang stack vertikal", value: "split-vertical" },
+          { name: "letterbox    — full frame + black bars", value: "letterbox" },
         ],
-        default: "split-vertical",
-      })) as "split-vertical" | "center-crop" | "letterbox";
+        default: "center-crop",
+      })) as "split-vertical" | "center-crop" | "letterbox" | "speaker-crop";
       const out = await processEditing.run({ videoId, mode });
       console.log(`\n[done] ${out.clipPaths.length} clip(s) edited`);
       return;
