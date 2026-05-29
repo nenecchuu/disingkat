@@ -1,0 +1,20 @@
+# Konfigurasi model CV dan AI yang digunakan pipeline
+# Ubah URL atau path di sini untuk pakai model yang berbeda
+
+face_detector:
+  url: "https://storage.googleapis.com/mediapipe-models/face_detector/blaze_face_full_range/float16/1/blaze_face_full_range.tflite"
+  filename: "blaze_face_full_range.tflite"
+
+face_landmarker:
+  url: "https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task"
+  filename: "face_landmarker.task"
+
+face_zone:
+  url: "https://storage.googleapis.com/mediapipe-models/face_detector/blaze_face_full_range/float16/1/blaze_face_full_range.tflite"
+  filename: "blaze_face_full_range.tflite"
+
+whisper:
+  default: "medium"
+  # Tersedia: tiny, base, small, medium, large
+  # Makin besar makin akurat tapi makin lambat
+  # Untuk Bahasa Indonesia, small atau medium direkomendasikan

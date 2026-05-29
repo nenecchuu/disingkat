@@ -3,6 +3,7 @@ export type VideoId = string;
 export interface ClipSpec {
   start: number;
   end: number;
+  hook_start?: number;
   title?: string;
   reason?: string;
 }

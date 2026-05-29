@@ -23,6 +23,7 @@ export interface PipelineOptions {
   from?: Stage;
   to?: Stage;
   editingMode?: "center-crop" | "speaker-crop" | "split-vertical" | "letterbox";
+  speakerMethod?: "largest-face" | "lip-movement";
   whisperModel?: "tiny" | "base" | "small" | "medium" | "large";
 }
 
@@ -67,7 +68,7 @@ export async function run(opts: PipelineOptions): Promise<void> {
         break;
       }
       case "process-editing": {
-        const out = await processEditing.run({ videoId, mode: opts.editingMode });
+        const out = await processEditing.run({ videoId, mode: opts.editingMode, speakerMethod: opts.speakerMethod });
         console.log(`reframed: ${out.clipPaths.length}`);
         break;
       }

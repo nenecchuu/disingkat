@@ -22,10 +22,10 @@ Kalau salah satu keyword di bawah muncul di transcript, segmen itu kemungkinan b
 
 # Rule pemilihan
 
-- **Hook awal**: mulai dari kalimat yang punya hook kuat — pertanyaan provokatif, klaim kontroversial, anekdot pembuka, atau statement yang bikin penasaran. JANGAN mulai di tengah kalimat atau di basa-basi.
+- **Hook awal**: identifikasi kalimat paling explosive dalam segmen — pertanyaan provokatif, klaim kontroversial, reveal mengejutkan, atau statement yang langsung bikin penasaran. Set `hook_start` ke timestamp kalimat itu. Kalau segmen memang sudah dimulai dengan hook kuat, `hook_start` = `start`.
 - **Closing**: akhiri di punchline, konklusi, atau statement penutup yang clear. JANGAN ngegantung di tengah kalimat.
-- **Durasi**: {{duration_min}}–{{duration_max}} detik per clip.
-- **Self-contained**: tiap clip harus bisa dipahami tanpa nonton segmen lain. Kalau referensinya butuh konteks bagian sebelumnya, skip.
+- **Durasi**: {{duration_min}}–{{duration_max}} detik per clip (dihitung dari `hook_start` ke `end`).
+- **Self-contained**: tiap clip harus bisa dipahami tanpa nonton segmen lain.
 - **Tone**: {{tone}}.
 - Maksimal 5 clip per video. Pilih yang paling kuat.
 
@@ -39,14 +39,16 @@ Format tiap item:
 {
   "start": 123.5,
   "end": 178.2,
+  "hook_start": 128.0,
   "title": "Judul singkat max 60 char",
   "reason": "1 kalimat kenapa ini berpotensi viral"
 }
 ```
 
-- `start` dan `end` dalam **detik (float)**, ambil dari timestamp transcript.
-- `title` punchy, max 60 karakter.
-- `reason` ringkas, 1 kalimat.
+- `start` — awal segmen asli (untuk konteks/subtitle)
+- `end` — akhir segmen
+- `hook_start` — detik mulai yang explosive untuk opening clip. Kalau awal segmen sudah kuat, sama dengan `start`.
+- Semua timestamp dalam **detik (float)**, ambil dari timestamp transcript.
 
 # Transcript
 

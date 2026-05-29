@@ -2,7 +2,7 @@
 
 Otomatis potong YouTube long-form jadi short clips (TikTok/Reels/Shorts).
 
-Pipeline: download transcript → analisa LLM → download segmen → reframe 9:16 → burn subtitle.
+Pipeline: download transcript → analisa LLM → download segmen → reframe 9:16 → (opsional) subtitle → output final.
 
 ---
 
@@ -35,7 +35,7 @@ cp configs/clip_config.example.yaml configs/clip_config.yaml
 cp configs/prompt.example.md configs/prompt.md
 ```
 
-Edit `configs/clip_config.yaml` dan `configs/prompt.md` sesuai kebutuhan (lihat bagian [Konfigurasi](#konfigurasi) di bawah).
+Edit `configs/clip_config.yaml` dan `configs/prompt.md` sesuai kebutuhan.
 
 ---
 
@@ -45,15 +45,22 @@ Edit `configs/clip_config.yaml` dan `configs/prompt.md` sesuai kebutuhan (lihat 
 bun run disingkat
 ```
 
-Jalankan dari root project. Akan muncul menu interaktif:
+Menu interaktif:
 
 ```
 ? Mau ngapain?
-  Proses video baru (dari URL YouTube)
-  Lanjutin video yang udah ada
-  Jalanin 1 stage doang
+  Full     — proses video baru dari URL YouTube
+  Existing — lanjutin video yang udah ada
+  Run      — jalanin 1 stage doang
   Keluar
 ```
+
+**Full / Existing** akan tanya:
+1. Mode reframe (center-crop, speaker-crop, split-vertical, letterbox)
+2. Kalau speaker-crop: metode deteksi (largest-face atau lip-movement)
+3. Tambahkan subtitle? → kalau ya, pilih Whisper model
+
+Pipeline berhenti di `process-editing` by default. Subtitle opsional.
 
 ---
 
@@ -61,7 +68,7 @@ Jalankan dari root project. Akan muncul menu interaktif:
 
 Default-nya, stage `analyze-transcript` mode manual — generate `prompt.txt` dan minta copy-paste ke Claude/ChatGPT.
 
-Untuk fully automated, setup dulu:
+Untuk fully automated:
 
 ```bash
 bun run configure
@@ -75,7 +82,7 @@ Wizard interaktif untuk pilih platform dan model. Tersedia:
 | OpenAI | `gpt-4.1`, `o3`, `gpt-4o` | API key |
 | Codex | `codex` | OAuth (login via browser) |
 
-Config disimpan ke `.env` di root project. Jalanin lagi `bun run configure` untuk ganti model/platform atau switch balik ke manual.
+Config disimpan ke `.env`. Jalanin lagi `bun run configure` untuk ganti atau switch ke manual.
 
 ---
 
@@ -84,72 +91,85 @@ Config disimpan ke `.env` di root project. Jalanin lagi `bun run configure` untu
 ### `configs/clip_config.yaml`
 
 ```yaml
-# Target audiens — dimasukkan ke prompt LLM
 audience: Indonesia, urban, 18-35
-
-# Tone konten
 tone: provocative-but-factual
 
-# Topik yang dicari oleh LLM
 topics_of_interest:
   - quotes yang menginspirasi
   - kritik kebijakan pemerintah
 
-# Keyword prioritas — segmen yang nyebut ini lebih diprioritaskan
 keywords:
   - Dollar
   - Sawit
 
-# Hal yang harus dihindari
 exclude:
-  - Clip yang jadi out of context karena diambil dari bagian yang salah
+  - Clip yang jadi out of context
 
-# Durasi clip yang diinginkan (detik)
 duration:
   min: 30
   max: 90
 
-# Detik ekstra yang ditambah ke akhir setiap clip saat download
-# Berguna agar potongan tidak terlalu kasar di ending. Default: 1.5
+# Detik ekstra di akhir clip saat download. Default: 1.5
 end_buffer: 3
 ```
 
 ### `configs/prompt.md`
 
-Template prompt yang dikirim ke LLM. Placeholder yang tersedia:
+Template prompt LLM untuk analisa transcript. Placeholder:
 
 | Placeholder | Diisi dengan |
 |---|---|
 | `{{audience}}` | `audience` dari clip_config.yaml |
-| `{{tone}}` | `tone` dari clip_config.yaml |
-| `{{topics_of_interest}}` | list `topics_of_interest` |
-| `{{keywords}}` | list `keywords` |
-| `{{exclude}}` | list `exclude` |
-| `{{duration_min}}` | `duration.min` |
-| `{{duration_max}}` | `duration.max` |
-| `{{subtitle}}` | transcript video (diisi otomatis saat runtime) |
+| `{{tone}}` | `tone` |
+| `{{topics_of_interest}}` | list topik |
+| `{{keywords}}` | list keyword |
+| `{{exclude}}` | list exclusion |
+| `{{duration_min}}` / `{{duration_max}}` | durasi min/max |
+| `{{subtitle}}` | transcript (diisi otomatis) |
+
+LLM diminta output `hook_start` — detik paling explosive dalam segmen untuk dijadikan opening clip. Kalau awal segmen sudah kuat, `hook_start == start`.
+
+### `configs/subtitle_prompt.md`
+
+Template prompt untuk koreksi subtitle via LLM (stage `verify-subtitle`). LLM menerima transcript semua clip sekaligus dan output daftar koreksi format `kata_salah -> kata_benar`.
+
+### `configs/models.yaml`
+
+URL dan filename model CV. Edit untuk pakai model yang berbeda tanpa ubah script:
+
+```yaml
+face_detector:
+  url: "https://..."
+  filename: "blaze_face_full_range.tflite"
+
+face_landmarker:
+  url: "https://..."
+  filename: "face_landmarker.task"
+
+whisper:
+  default: "base"
+  # tiny, base, small, medium, large
+```
+
+Model di-download otomatis ke `scripts/models/` saat pertama kali dibutuhkan.
 
 ---
 
 ## Stages
 
-Pipeline terdiri dari 5 stage yang bisa dijalanin secara standalone via menu interaktif:
-
 | Stage | Baca | Tulis |
 |---|---|---|
 | `download-transcript` | YouTube URL | `data/transcript.txt`, `data/subtitle.vtt` |
 | `analyze-transcript` | `data/subtitle.vtt` | `data/clips.json` |
-| `download-video` | `data/clips.json` | `raw/clip_NN_raw.mp4` per clip |
-| `process-editing` | `raw/clip_NN_raw.mp4` | `reframed/clip_NN_reframed.mp4` (9:16) |
+| `download-video` | `data/clips.json` | `raw/clip_NN_raw.mp4` |
+| `process-editing` | `raw/clip_NN_raw.mp4` | `reframed/clip_NN_reframed.mp4` |
 | `transcribe` | `reframed/clip_NN_reframed.mp4` | `data/clip_NN_words.json` |
 | `verify-subtitle` | `data/clip_NN_words.json` | `data/clip_NN_words.json` (dikoreksi) |
-| `burn-subtitle` | `reframed/clip_NN_reframed.mp4` + `data/clip_NN_words.json` | `clip_NN_final.mp4` |
-
-Semua artifact disimpan di `workdir/<video-id>/`.
+| `burn-subtitle` | `reframed/` + `data/clip_NN_words.json` | `clip_NN_final.mp4` |
 
 ### analyze-transcript
 
-**Auto** (kalau `DISINGKAT_MODEL` di-set via `bun run configure`): langsung call LLM, simpan hasil ke `data/clips.json`.
+**Auto** (kalau `DISINGKAT_MODEL` di-set): langsung call LLM → `data/clips.json`.
 
 **Manual**: generate `data/prompt.txt`, lalu:
 1. Copy isi `workdir/<id>/data/prompt.txt`
@@ -163,45 +183,47 @@ Format `clips.json`:
   {
     "start": 123.5,
     "end": 178.2,
+    "hook_start": 128.0,
     "title": "Judul singkat max 60 char",
     "reason": "1 kalimat kenapa ini berpotensi viral"
   }
 ]
 ```
 
-Field `title` dan `reason` opsional — tidak berpengaruh ke proses rendering, hanya untuk referensi.
+`hook_start` — detik mulai yang explosive. Video di-download dari `hook_start`, bukan `start`. Kalau tidak ada, fallback ke `start`.
 
 ### process-editing — reframe modes
 
-Pilih mode saat stage `process-editing` dijalankan:
-
 | Mode | Deskripsi |
 |---|---|
-| `center-crop` | Crop bagian tengah frame ke rasio 9:16. **Default.** |
-| `speaker-crop` | Auto-detect scene cut, crop ke wajah speaker di tiap scene. |
+| `center-crop` | Crop tengah ke 9:16. **Default.** |
+| `speaker-crop` | Auto-detect scene cut, crop ke wajah speaker per scene. |
 | `split-vertical` | Split frame kiri/kanan, stack vertikal. |
-| `letterbox` | Scale fit + black bars atas-bawah. |
+| `letterbox` | Scale fit + black bars. |
 
-#### speaker-crop
+#### speaker-crop — metode deteksi
 
-Mode ini tidak butuh setup tambahan — dependency (`opencv-python`, `mediapipe`, `scenedetect`) dikelola otomatis oleh `uv`.
+| Metode | Deskripsi |
+|---|---|
+| `largest-face` | Wajah terbesar di frame. **Default.** Cepat, cocok untuk shot yang sudah di-cut ke speaker. |
+| `lip-movement` | Wajah dengan mulut paling terbuka (FaceLandmarker). Lebih akurat untuk 2 orang dalam 1 frame. |
 
-Cara kerjanya:
-1. **Detect scene cuts** via PySceneDetect `AdaptiveDetector` — lebih akurat dari histogram diff manual
-2. **Per segment**, sample beberapa frame → detect wajah pakai MediaPipe `blaze_face_full_range`
-3. Pilih wajah terbesar (paling dekat kamera), dengan NMS untuk eliminasi double detection
-4. **Encode tiap segment** dengan crop yang sudah fix, lalu concat — tidak ada transisi, cut langsung snap ke posisi baru
+#### Cara kerja speaker-crop:
+1. Detect scene cuts via PySceneDetect `AdaptiveDetector`
+2. Per segment, sample beberapa frame → detect wajah
+3. Encode tiap segment dengan crop fix → concat (cut langsung, tanpa transisi)
 
-Model CV di-download otomatis ke `scripts/models/` saat pertama kali dijalankan.
+### transcribe + verify-subtitle + burn-subtitle
 
-Fallback ke `center-crop` kalau deteksi gagal atau tidak ada wajah terdeteksi.
+Subtitle pipeline (opsional):
 
-### process-rendering — subtitle quality
+1. **transcribe** — Whisper word-level timestamps → `data/clip_NN_words.json`
+2. **verify-subtitle** — koreksi kata via LLM (1 API call untuk semua clip), atau buka manual di editor kalau tidak ada LLM
+3. **burn-subtitle** — group per kalimat (gap-based), detect posisi wajah untuk hindari overlap, burn ke video
 
-Subtitle di-burn ke video menggunakan `libass` kalau tersedia, fallback ke `drawtext` kalau tidak.
+Subtitle di-burn pakai `libass` kalau tersedia, fallback ke `drawtext`.
 
-`ffmpeg` dari Homebrew default tidak include `libass`. Untuk kualitas lebih baik di macOS:
-
+Untuk kualitas lebih baik di macOS:
 ```bash
 brew tap homebrew-ffmpeg/ffmpeg
 brew install homebrew-ffmpeg/ffmpeg/ffmpeg --with-libass
@@ -215,11 +237,11 @@ brew install homebrew-ffmpeg/ffmpeg/ffmpeg --with-libass
 |---|---|
 | `DISINGKAT_PLATFORM` | Platform LLM: `anthropic`, `openai`, atau `codex` |
 | `DISINGKAT_MODEL` | Model ID, misal `claude-opus-4-7` atau `gpt-4.1` |
-| `ANTHROPIC_API_KEY` | API key Anthropic (kalau platform = anthropic) |
-| `OPENAI_API_KEY` | API key OpenAI (kalau platform = openai) |
+| `ANTHROPIC_API_KEY` | API key Anthropic |
+| `OPENAI_API_KEY` | API key OpenAI |
 | `DISINGKAT_WORKDIR` | Override lokasi workdir. Default: `./workdir` |
 
-Semua variable ini bisa diset di file `.env` di root project — Bun auto-load saat runtime.
+Semua variable bisa diset di `.env` — Bun auto-load saat runtime.
 
 ---
 
@@ -228,30 +250,35 @@ Semua variable ini bisa diset di file `.env` di root project — Bun auto-load s
 ```
 disingkat/
 ├── configs/
-│   ├── clip_config.yaml        # konfigurasi clip (audience, topik, durasi)
-│   └── prompt.md               # template prompt LLM
+│   ├── clip_config.yaml        # konfigurasi clip
+│   ├── prompt.md               # template prompt analisa
+│   ├── subtitle_prompt.md      # template prompt koreksi subtitle
+│   └── models.yaml             # URL & filename model CV
 ├── scripts/
-│   ├── get_transcript.py       # download transcript dari YouTube
-│   ├── detect_scenes.py        # deteksi scene cut via PySceneDetect
-│   ├── detect_speakers.py      # deteksi posisi wajah per scene
-│   └── models/                 # model CV (di-download otomatis, di-gitignore)
-│       └── blaze_face_full_range.tflite
+│   ├── get_transcript.py       # download transcript YouTube
+│   ├── detect_scenes.py        # scene cut detection (PySceneDetect)
+│   ├── detect_speakers.py      # posisi wajah per scene
+│   ├── detect_face_zone.py     # zona wajah untuk posisi subtitle
+│   ├── transcribe_clip.py      # Whisper word-level transcription
+│   └── models/                 # model CV (auto-download, gitignored)
 ├── src/
-│   ├── cli.ts                  # menu interaktif
-│   ├── pipeline.ts             # orchestrator stage
+│   ├── cli.ts
+│   ├── pipeline.ts
 │   ├── stages/
 │   │   ├── download-transcript.ts
 │   │   ├── analyze-transcript.ts
 │   │   ├── download-video.ts
 │   │   ├── process-editing.ts
-│   │   └── process-rendering.ts
-│   ├── llm.ts                  # integrasi Anthropic / OpenAI / Codex
-│   ├── subtitle.ts             # parser VTT + slicer SRT
+│   │   ├── transcribe.ts
+│   │   ├── verify-subtitle.ts
+│   │   └── burn-subtitle.ts
+│   ├── llm.ts
+│   ├── subtitle.ts
 │   ├── types.ts
-│   └── workdir.ts              # path helpers
+│   └── workdir.ts
 └── workdir/
     └── <video-id>/
-        ├── clip_01_final.mp4   # ← output akhir
+        ├── clip_NN_final.mp4   # ← output akhir
         ├── raw/
         │   └── clip_NN_raw.mp4
         ├── reframed/

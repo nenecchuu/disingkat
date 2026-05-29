@@ -8,6 +8,7 @@ import { paths } from "../workdir.ts";
 export interface ReframeInput {
   videoId: VideoId;
   mode?: "split-vertical" | "center-crop" | "letterbox" | "speaker-crop";
+  speakerMethod?: "largest-face" | "lip-movement";
 }
 
 interface SpeakerEvent {
@@ -31,7 +32,7 @@ export async function run(input: ReframeInput): Promise<ReframeOutput> {
     const outP = p.reframedClip(i + 1);
 
     if (mode === "speaker-crop") {
-      await reframeSpeakerCrop(inP, outP, p, i + 1);
+      await reframeSpeakerCrop(inP, outP, p, i + 1, input.speakerMethod ?? "largest-face");
     } else {
       const filter = filterFor(mode);
       await $`ffmpeg -y -i ${inP} -filter_complex ${filter} -c:v libx264 -preset veryfast -c:a copy ${outP}`.quiet();
@@ -50,6 +51,7 @@ async function reframeSpeakerCrop(
   outP: string,
   p: ReturnType<typeof paths>,
   clipIdx: number,
+  speakerMethod: "largest-face" | "lip-movement",
 ): Promise<void> {
   const tag = String(clipIdx).padStart(2, "0");
   const segmentsPath = p.scenes(clipIdx);
@@ -65,7 +67,7 @@ async function reframeSpeakerCrop(
 
   // Step 2: detect speaker per segment
   console.log(`  clip ${clipIdx}: detecting speakers...`);
-  const speakersResult = await $`uv run scripts/detect_speakers.py ${inP} ${segmentsPath} ${eventsPath}`.nothrow();
+  const speakersResult = await $`uv run scripts/detect_speakers.py ${inP} ${segmentsPath} ${eventsPath} --method ${speakerMethod}`.nothrow();
   if (speakersResult.exitCode !== 0 || !(await fileExists(eventsPath))) {
     console.log(`  clip ${clipIdx}: speaker detection gagal, fallback ke center-crop`);
     return fallbackCenterCrop(inP, outP);

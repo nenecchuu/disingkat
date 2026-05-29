@@ -25,6 +25,7 @@ const STAGES: Stage[] = [
 ];
 
 type EditingMode = "center-crop" | "speaker-crop" | "split-vertical" | "letterbox";
+type SpeakerMethod = "largest-face" | "lip-movement";
 type WhisperModel = "tiny" | "base" | "small" | "medium" | "large";
 
 // ── shared prompts ────────────────────────────────────────────────────────────
@@ -40,6 +41,17 @@ async function askEditingMode(): Promise<EditingMode> {
     ],
     default: "center-crop",
   }) as Promise<EditingMode>;
+}
+
+async function askSpeakerMethod(): Promise<SpeakerMethod> {
+  return select({
+    message: "Metode deteksi speaker:",
+    choices: [
+      { name: "largest-face  — wajah terbesar di frame (default, lebih cepat)", value: "largest-face" },
+      { name: "lip-movement  — wajah dengan mulut paling terbuka (lebih akurat untuk 2 orang dalam 1 frame)", value: "lip-movement" },
+    ],
+    default: "largest-face",
+  }) as Promise<SpeakerMethod>;
 }
 
 async function askWhisperModel(): Promise<WhisperModel> {
@@ -92,6 +104,7 @@ async function runNew() {
   });
 
   const editingMode  = await askEditingMode();
+  const speakerMethod: SpeakerMethod | undefined = editingMode === "speaker-crop" ? await askSpeakerMethod() : undefined;
   const withSubtitle = await askWithSubtitle();
   const whisperModel = withSubtitle ? await askWhisperModel() : undefined;
   const to: Stage    = withSubtitle ? "burn-subtitle" : "process-editing";
@@ -101,6 +114,7 @@ async function runNew() {
     from: "download-transcript",
     to,
     editingMode,
+    speakerMethod,
     whisperModel,
   });
 }
@@ -115,15 +129,15 @@ async function runContinue() {
     default: "analyze-transcript",
   })) as Stage;
 
-  const editingMode  = willRun(from, "process-editing", "process-editing") ? await askEditingMode()  : undefined;
-  const withSubtitle = await askWithSubtitle();
-  const whisperModel = withSubtitle ? await askWhisperModel() : undefined;
-  const to: Stage    = withSubtitle ? "burn-subtitle" : "process-editing";
+  const editingMode   = willRun(from, "process-editing", "process-editing") ? await askEditingMode()  : undefined;
+  const speakerMethod: SpeakerMethod | undefined = editingMode === "speaker-crop" ? await askSpeakerMethod() : undefined;
+  const withSubtitle  = await askWithSubtitle();
+  const whisperModel  = withSubtitle ? await askWhisperModel() : undefined;
+  const to: Stage     = withSubtitle ? "burn-subtitle" : "process-editing";
 
-  // Kalau from sudah melewati process-editing, to harus minimal from
   const effectiveTo = STAGES.indexOf(to) >= STAGES.indexOf(from) ? to : "burn-subtitle";
 
-  await pipeline.run({ urlOrId: videoId, from, to: effectiveTo, editingMode, whisperModel });
+  await pipeline.run({ urlOrId: videoId, from, to: effectiveTo, editingMode, speakerMethod, whisperModel });
 }
 
 async function runSingle() {
@@ -161,7 +175,8 @@ async function runSingle() {
     }
     case "process-editing": {
       const mode = await askEditingMode();
-      const out = await processEditing.run({ videoId, mode });
+      const speakerMethod = mode === "speaker-crop" ? await askSpeakerMethod() : undefined;
+      const out = await processEditing.run({ videoId, mode, speakerMethod });
       console.log(`\n[done] ${out.clipPaths.length} clip(s) edited`);
       return;
     }

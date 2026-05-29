@@ -30,7 +30,8 @@ export async function run(input: CutInput): Promise<CutOutput> {
   for (let i = 0; i < clips.length; i++) {
     const c = clips[i];
     const out = p.rawClip(i + 1);
-    const section = `*${toYtTimestamp(c.start)}-${toYtTimestamp(c.end + endBuffer)}`;
+    const cutStart = c.hook_start ?? c.start;
+    const section = `*${toYtTimestamp(cutStart)}-${toYtTimestamp(c.end + endBuffer)}`;
 
     await $`yt-dlp \
       --download-sections ${section} \

@@ -192,6 +192,7 @@ function parseClips(raw: string): ClipSpec[] {
     return {
       start: c.start as number,
       end: c.end as number,
+      hook_start: typeof c.hook_start === "number" ? c.hook_start : undefined,
       title: typeof c.title === "string" ? c.title : undefined,
       reason: typeof c.reason === "string" ? c.reason : undefined,
     } satisfies ClipSpec;
